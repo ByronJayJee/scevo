@@ -1,0 +1,9 @@
+name: network_graph
+channels:
+  - defaults
+dependencies:
+  - requests
+  - networkx
+  - matplotlib
+  - pandas
+
