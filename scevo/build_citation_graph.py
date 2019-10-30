@@ -78,37 +78,39 @@ def pub_grab(pmid=23456789, pub_dict={}):
     #print(pub['references'])
     return pub, pub_dict
 
-pmids_of_interest = [23456789, 23456790, 23456791, 23456793]
-#pmids_of_interest = [23456789]
-max_crawl_depth=1
 
-pub_dict = {}
+if __name__ == "__main__":
+    pmids_of_interest = [23456789, 23456790, 23456791, 23456793]
+    #pmids_of_interest = [23456789]
+    max_crawl_depth=1
 
-# create empty graph
-G = nx.DiGraph()
+    pub_dict = {}
 
-for root_pmid in pmids_of_interest:
-    pub, pub_dict = pub_grab(root_pmid, pub_dict)
-    G, pub_dict = create_di_edges_refs(G, pub, pub_dict, max_crawl_depth=max_crawl_depth)
-    G, pub_dict = create_di_edges_citeby(G, pub, pub_dict, max_crawl_depth=max_crawl_depth)
+    # create empty graph
+    G = nx.DiGraph()
 
-print(nx.number_of_nodes(G))
-print(nx.number_of_edges(G))
-#print(nx.number_connected_components(G))
+    for root_pmid in pmids_of_interest:
+        pub, pub_dict = pub_grab(root_pmid, pub_dict)
+        G, pub_dict = create_di_edges_refs(G, pub, pub_dict, max_crawl_depth=max_crawl_depth)
+        G, pub_dict = create_di_edges_citeby(G, pub, pub_dict, max_crawl_depth=max_crawl_depth)
 
-print("G.nodes()")
-print(G.nodes())
+    print(nx.number_of_nodes(G))
+    print(nx.number_of_edges(G))
+    #print(nx.number_connected_components(G))
 
-fig, ax = plt.subplots(figsize=(35, 8))
+    print("G.nodes()")
+    print(G.nodes())
 
-#nx.draw(G, pos=pub_dict, with_labels=True, ax=ax)
-nx.draw_networkx(G, pos=pub_dict, with_labels=True, ax=ax)
-#nx.draw_spectral(G, pos=nx.spring_layout(G), with_labels=True)
-#nx.draw_planar(G, with_labels=True)
-#nx.draw_spring(G, with_labels=True)
-#nx.draw_circular(G, with_labels=True)
-#draw(G, layout='circo')
+    fig, ax = plt.subplots(figsize=(35, 8))
 
-ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
+    #nx.draw(G, pos=pub_dict, with_labels=True, ax=ax)
+    nx.draw_networkx(G, pos=pub_dict, with_labels=True, ax=ax)
+    #nx.draw_spectral(G, pos=nx.spring_layout(G), with_labels=True)
+    #nx.draw_planar(G, with_labels=True)
+    #nx.draw_spring(G, with_labels=True)
+    #nx.draw_circular(G, with_labels=True)
+    #draw(G, layout='circo')
 
-plt.show()
+    ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
+
+    plt.show()
