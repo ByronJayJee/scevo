@@ -1,4 +1,4 @@
-name: network_graph
+name: scevo
 channels:
   - defaults
 dependencies:
