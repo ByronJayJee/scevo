@@ -44,8 +44,8 @@ class Icite:
     self.cached = {}
 
   def fetch(self, url, param):
-    assert type(url) is types.StringType, "url must be a string: %r" % url
-    assert type(param) is types.StringType, "param must be a string: %r" % param
+    assert isinstance(url, str), "url must be a string: %r" % url
+    assert isinstance(param, str), "param must be a string: %r" % param
     prepared_url = url.replace(":param", param)
     print(":fetch %r" % prepared_url)
     resp = requests.get(prepared_url)
