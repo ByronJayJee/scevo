@@ -90,13 +90,15 @@ class Icite:
     # maybe a dead branch on the tree
     if len(ids) == 0: return fetched
     # fetch all ids at this depth
-    pubs = Icite.fetch_ids_parallel(ids)
-    print(pubs)
+    pubs = Icite.fetch_ids_parallel(ids, cache=fetched)
     for pub in pubs: fetched.update({pub["pmid"]: pub})
     if depth >= max_depth: return fetched
     pubs_citations = map(lambda resp: resp[Icite.CITED_BY], pubs)
     next_level = List.flatten(pubs_citations)
-    return Icite.fetch_citation_tree(ids=next_level, fetched=fetched, depth=depth + 1, max_depth=max_depth)
+    return Icite.fetch_citation_tree(ids=next_level, 
+                                     fetched=fetched, 
+                                     depth=depth+1, 
+                                     max_depth=max_depth)
 
 # currently this loads the test id pub tree to a depth of 5 in ~2.3m
 if __name__ == "__main__":
