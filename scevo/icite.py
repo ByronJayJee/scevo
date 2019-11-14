@@ -5,8 +5,8 @@
   - Importable for use by other scripts
 
 Usage:
-  icite.py fetch <pmid> [--out=<out> | --verbose]
-  icite.py tree <pmid> [--max-depth=<max_depth> | --out=<out> | --verbose]
+  icite.py fetch <pmid> [--out=<out>]
+  icite.py tree <pmid> [--max-depth=<max_depth>, --verbose]
   icite.py (-h | --help)
   icite.py --version
 
@@ -18,15 +18,14 @@ Options:
   --verbose
 
 """
-
-import asyncio
+import multiprocessing as mp
 import types
 import re
 import sys
 import itertools
 import requests
 import json
-import pprint
+from list import List
 
 class Icite:
   #
@@ -40,10 +39,6 @@ class Icite:
   BATCH_KEY  = "data"
   # the key where a publications citation tree lives
   CITED_BY   = "cited_by"
-  # Network Cache handles:
-  # 1. cyclical references in the Graph
-  # 2. in-memory caching for the entire session
-  CACHE      = {}
 
   @staticmethod
   def log(stuff):
@@ -61,48 +56,46 @@ class Icite:
     return resp.json()
 
   @staticmethod
-  def prepare_ids(ids = []):
+  def prepare_ids(ids = [], cache={}):
     assert len(ids) > 0, "cannot prepare empty ids"
     string_ids  = map(lambda id: str(id), ids)
-    needs_fetch = filter(lambda id: id not in Icite.CACHE, string_ids)
+    needs_fetch = filter(lambda id: id not in cache, string_ids)
     return ",".join(needs_fetch)
 
-  # todo: this could be refactored to be a multithreaded divide-and-conquer algorithm
   @staticmethod
-  def fetch_by_ids(ids = [], fetched = []):
-    if len(ids) == 0: return fetched
-    # icite api is limited to 100 ids per batch
-    # so we slice this first batch
-    this_batch = ids[0:99]
-    # and store the next window to keep recursively fetching
-    # as necessary
-    next_batch    = ids[100:-1]
-    newly_fetched = Icite.req(Icite.BATCH_URL, param = Icite.prepare_ids(this_batch))
-    pubs          = newly_fetched[Icite.BATCH_KEY]
-    for pub in pubs: Icite.CACHE.update({pub["pmid"]: pub})
-    return Icite.fetch_by_ids(next_batch, fetched + pubs)
+  def fetch_ids_pure(ids = [], cache={}):
+    if len(ids) == 0: return []
+    newly_fetched = Icite.req(Icite.BATCH_URL, 
+      param=Icite.prepare_ids(ids, cache))
+    return newly_fetched[Icite.BATCH_KEY]
+
+  @staticmethod
+  def fetch_ids_parallel(ids = [], cache={}, results=[]):
+    worker_pool = mp.Pool(mp.cpu_count())
+    for batch in List.chunk(ids, 100):
+      worker_pool.apply_async(Icite.fetch_ids_pure, 
+        args=(batch, cache),
+        callback=lambda result: results.append(result))
+    worker_pool.close()
+    worker_pool.join()
+    return List.flatten(results)
+    
 
   @staticmethod
   def fetch_by_id(id):
-    return Icite.fetch_by_ids([id])[0]
-
-  # used to lazily reconstruct a tree task to keep memory complexity down
-  @staticmethod
-  def backfill(ids, table = {}):
-    for id in ids:
-      if id in Icite.CACHE: table.update({id: Icite.CACHE[id]})
-    return table
+    return Icite.fetch_ids_pure([id])[0]
 
   @staticmethod
-  def fetch_citation_tree(ids=[], fetched=[], depth=0, max_depth= 5):
+  def fetch_citation_tree(ids=[], fetched={}, depth=0, max_depth= 5):
     # maybe a dead branch on the tree
-    if len(ids) == 0: return Icite.backfill(fetched)
+    if len(ids) == 0: return fetched
     # fetch all ids at this depth
-    pubs = Icite.fetch_by_ids(ids)
-    fetched = fetched + ids
-    if depth >= max_depth: return Icite.backfill(fetched)
+    pubs = Icite.fetch_ids_parallel(ids)
+    print(pubs)
+    for pub in pubs: fetched.update({pub["pmid"]: pub})
+    if depth >= max_depth: return fetched
     pubs_citations = map(lambda resp: resp[Icite.CITED_BY], pubs)
-    next_level = list(itertools.chain.from_iterable(pubs_citations))
+    next_level = List.flatten(pubs_citations)
     return Icite.fetch_citation_tree(ids=next_level, fetched=fetched, depth=depth + 1, max_depth=max_depth)
 
 # currently this loads the test id pub tree to a depth of 5 in ~2.3m
@@ -110,14 +103,13 @@ if __name__ == "__main__":
   from docopt import docopt
   argv = docopt(__doc__, version='NIH Icite 1.0')
   pmid = [argv["<pmid>"]]
-  fetched = None
+  results = None
   # handle all operations cases
   if argv["fetch"]: 
-    fetched = Icite.fetch_by_ids(pmid)
+    results = Icite.fetch_by_id(pmid)
   if argv["tree"]:  
-    fetched = Icite.fetch_citation_tree(ids=pmid, max_depth=int(argv["--max-depth"]))
-
-  results = {"length": len(fetched), "data": fetched}
+    results = Icite.fetch_citation_tree(ids=pmid, max_depth=int(argv["--max-depth"]))
+    results = {"length": len(results), "data": results}
 
   if argv["--verbose"]:
     with open(argv["--out"], 'w') as outfile:
